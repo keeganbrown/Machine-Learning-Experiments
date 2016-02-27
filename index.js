@@ -1,5 +1,6 @@
 'use strict';
 const synaptic = require('synaptic');
+const fs = require('fs');
 const Architect = synaptic.Architect;
 
 
@@ -21,13 +22,11 @@ const TRAINING_SET = ([0,1,2,3,4,5,6,7,8,9]).map((num, index, arr) => {
 console.log(TRAINING_SET);
 
 var LSM = new Architect.Liquid(input, pool, output, connections, gates);
-
-console.log(LSM);
-//[ 0, 1, 2, 3, 5, 6, 7, 8, 9 ] => 4
-
 let total = 0;
 let right = 0;
-function train () {
+let last = 200;
+
+function trainNetwork () {
   LSM.trainer.train(TRAINING_SET, {
     iterations: 200000,
     schedule: {
@@ -40,8 +39,12 @@ function train () {
       }
     }
   });
+  testNetwork();
+}
 
+function testNetwork () {
   let precision = 5;
+  let perc = 0;
   [1,1,1,1,1]
     .map((num)=>{
       return TRAINING_SET[Math.floor(Math.random()*TRAINING_SET.length)]
@@ -52,12 +55,28 @@ function train () {
       //console.log( trained, 'expected:', setItem.output, 'similarity:'  );
       if (Math.floor(trained[0]*precision) == Math.floor(setItem.output[0]*precision)) {
         right += 1;
-        total && right && console.log(Math.floor((right/total)*100), right, total);
+        perc = Math.floor((right/total)*100);
+        total && right && console.log(perc, right, total);
       }
       LSM.propagate(0.1, setItem.output)
     });
 
-  process.nextTick(train);
+  saveNetwork(perc);
 }
 
-train();
+function saveNetwork (perc) {
+  if (Math.abs(perc-last) === 0 && perc > 60) {
+    last = perc;
+    fs.writeFile("./network.json", JSON.stringify(LSM.toJSON()), function(err) {
+      if(err) {
+        return console.log(err);
+      }
+      process.nextTick(trainNetwork);
+      console.log("The file was saved!");
+    });
+  } else {
+    process.nextTick(trainNetwork);
+  }
+}
+
+trainNetwork();
